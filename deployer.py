@@ -1,17 +1,44 @@
 from __future__ import print_function
-import sys
+
 import argparse
 import hashlib
-import json
-import os
-import zipfile
-import platform
-import os.path
 import imp
-import yaml
+import json
+import os.path
+import platform
+import sys
+import zipfile
 
 import boto3
+import os
+import yaml
 from botocore.exceptions import ClientError
+from ruamel import yaml as ry
+
+
+class Ref(str):
+    @staticmethod
+    def yaml_dumper(dumper, data):
+        return dumper.represent_scalar('!Ref', u'{}'.format(data), style='x')
+
+    def yaml_constructor(loader, node):
+        value = loader.construct_scalar(node)
+        return Ref(value)
+
+
+ry.add_representer(Ref, Ref.yaml_dumper)
+ry.add_constructor('!Ref', Ref.yaml_constructor,
+                   constructor=ry.constructor.SafeConstructor)
+
+
+def choose_scalar_style(self):
+    if self.event.style == 'x':
+        return ''
+    return self.org_choose_scalar_style()
+
+
+ry.emitter.Emitter.org_choose_scalar_style = ry.emitter.Emitter.choose_scalar_style
+ry.emitter.Emitter.choose_scalar_style = choose_scalar_style
 
 tmp_folder = 'C:\\temp\\' if platform.system() == 'Windows' else "/tmp/"
 
@@ -257,7 +284,7 @@ def do_init():
             default_flow_style=False
         )
     with(open("cloudformation/template.yaml", "w+")) as new_template:
-        yaml.dump(
+        ry.dump(
             {
                 "AWSTemplateFormatVersion": "2010-09-09",
                 "Description": "ChangeMe",
@@ -266,16 +293,21 @@ def do_init():
                         "Type": "AWS::EC2::Instance",
                         "Properties":
                             {
-                                "ImageId": "\!Ref AParameter"
+                                "ImageId": Ref("AParameter")
                             }
                     }
 
+                },
+                "Parameters": {
+                    "AParameter": {
+                        "Type": "String"
+                    }
                 }
             },
             new_template,
             default_flow_style=False
         )
-    with(open("cloudformation/template.config.json","w+")) as new_template_config:
+    with(open("cloudformation/template.config.json", "w+")) as new_template_config:
         json.dump(
             [
                 {
