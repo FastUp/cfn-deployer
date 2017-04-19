@@ -21,6 +21,7 @@ class Ref(str):
     def yaml_dumper(dumper, data):
         return dumper.represent_scalar('!Ref', u'{}'.format(data), style='x')
 
+    @staticmethod
     def yaml_constructor(loader, node):
         value = loader.construct_scalar(node)
         return Ref(value)
@@ -57,33 +58,52 @@ def release_lambda(config, each_lambda_config):
     release_bucket = config["release_bucket"]
     version = config["version"]
     project_name = config["project_name"]
+    env = config["env"]
     os.chdir('lambda' + "/" + lambda_folder)
     code_zip_file_name = lambda_folder + '.zip'
-    lambda_code_zip = zipfile.ZipFile(tmp_folder + code_zip_file_name, 'w')
+    zip_it_in_tmp(code_zip_file_name)
+    lambda_code_zip_key = checked_upload(tmp_folder, code_zip_file_name, config, "lambda")
+    os.chdir('../..')
+    modify_template(config, each_lambda_config["logical_resource_name"], lambda_code_zip_key, release_bucket, outer_key="Code", bucket="S3Bucket", key="S3Key",
+                    version="S3ObjectVersion")
+
+
+def modify_template(config, logical_resource_name, upload_s3_key, release_bucket, **kwargs):
+    with open("cloudformation/" + config["template"], mode="r+") as template_file:
+        s3_client = boto3_session.client('s3')
+        object_info = s3_client.head_object(
+            Bucket=release_bucket, Key=upload_s3_key
+        )
+        template_contents = json.load(template_file)
+        template_contents["Resources"][logical_resource_name]["Properties"][kwargs["outer_key"]] = {
+            kwargs["bucket"]: release_bucket,
+            kwargs["key"]: upload_s3_key,
+            kwargs["version"]: object_info["VersionId"]
+        }
+        # template_contents["Resources"][each_lambda_config["function_version_logical_resource_name"]]["Properties"]["CodeSha256"] = new_hash
+        template_file.seek(0)
+        json.dump(template_contents, template_file, indent=2)
+        template_file.truncate()
+
+
+def checked_upload(directory, file_name, config, s3_prefix):
+    release_bucket = config["release_bucket"]
+    version = config["version"]
+    project_name = config["project_name"]
     env = config["env"]
-    _zip_dir(".", lambda_code_zip)
+    new_hash = calculate_hash(directory + file_name)
     s3_client = boto3_session.resource('s3')
-    lambda_code_zip_key = project_name + "/" + version + "/" + env + '/lambda/' + code_zip_file_name
-    lambda_code_zip_hash_key = project_name + "/" + version + "/" + env + '/lambda/' + code_zip_file_name + ".md5"
-    lambda_code_hash_s3_obj = s3_client.Object(release_bucket, lambda_code_zip_hash_key)
-    print(lambda_code_zip_hash_key)
-    BLOCKSIZE = 65536
-    hasher = hashlib.md5()
-    with open(tmp_folder + code_zip_file_name, 'rb') as afile:
-        buf = afile.read(BLOCKSIZE)
-        while len(buf) > 0:
-            hasher.update(buf)
-            buf = afile.read(BLOCKSIZE)
+    object_s3_key = project_name + "/" + version + "/" + env + '/' + s3_prefix + '/' + file_name
+    hash_s3_key = project_name + "/" + version + "/" + env + '/' + s3_prefix + '/' + file_name + ".md5"
+    hash_s3_obj = s3_client.Object(release_bucket, hash_s3_key)
     deployed_hash = None
-    new_hash = hasher.hexdigest()
-    print(new_hash)
     try:
-        deployed_hash = lambda_code_hash_s3_obj.get()["Body"].read().decode("utf-8")
+        deployed_hash = hash_s3_obj.get()["Body"].read().decode("utf-8")
         print(deployed_hash)
     except ClientError as e:
         if e.response["Error"]["Code"] == "NoSuchKey":
             print(
-                "MD5 hashcode of lambda code in folder " + lambda_folder + " was never uploaded or has been deleted. " +
+                "MD5 hashcode of file " + directory + file_name + " was never uploaded or has been deleted. " +
                 "Will upload new MD5 hashcode "
                 + new_hash
             )
@@ -91,40 +111,50 @@ def release_lambda(config, each_lambda_config):
             raise e
     if deployed_hash is None or deployed_hash != new_hash:
         print(
-            "MD5 hashcode of deployed lambda code in folder " + lambda_folder + "(" + str(deployed_hash) +
+            "MD5 hashcode of deployed lambda code in folder " + directory + file_name + "(" + str(deployed_hash) +
             ") is not same as MD5 hashcode of new code (" + new_hash +
             "). Will upload new code."
         )
-        print("\ts3://" + release_bucket + "/" + lambda_code_zip_hash_key)
-        lambda_code_hash_s3_obj.put(Body=bytes(new_hash))
-        lambda_code_s3_obj = s3_client.Object(release_bucket, lambda_code_zip_key)
-        print("\ts3://" + release_bucket + "/" + lambda_code_zip_key)
-        lambda_code_s3_obj.upload_file(tmp_folder + code_zip_file_name)
+        print("\ts3://" + release_bucket + "/" + hash_s3_key)
+        hash_s3_obj.put(Body=bytes(new_hash))
+        lambda_code_s3_obj = s3_client.Object(release_bucket, object_s3_key)
+        print("\ts3://" + release_bucket + "/" + object_s3_key)
+        lambda_code_s3_obj.upload_file(directory + file_name)
 
     else:
         print(
-            "MD5 hashcode of deployed lambda code in folder " + lambda_folder + " (" + deployed_hash +
+            "MD5 hashcode of deployed lambda code in folder " + directory + file_name + " (" + deployed_hash +
             ") is same as MD5 hashcode of new code " + new_hash +
             ". Will not upload new code."
         )
+    return object_s3_key
 
-    os.chdir('../..')
-    code_zip_file_name = lambda_folder + '.zip'
-    lambda_code_zip_key = project_name + "/" + version + "/" + env + '/lambda/' + code_zip_file_name
-    with open("cloudformation/" + config["template"], mode="r+") as template_file:
-        s3_client = boto3_session.client('s3')
-        object_info = s3_client.head_object(
-            Bucket=release_bucket, Key=lambda_code_zip_key
-        )
-        template_contents = json.load(template_file)
-        template_contents["Resources"][each_lambda_config["logical_resource_name"]]["Properties"]["Code"] = {
-            "S3Bucket": release_bucket,
-            "S3Key": lambda_code_zip_key,
-            "S3ObjectVersion": object_info["VersionId"]
-        }
-        template_file.seek(0)
-        json.dump(template_contents, template_file, indent=2)
-        template_file.truncate()
+
+def zip_it_in_tmp(file_name):
+    lambda_code_zip = zipfile.ZipFile(tmp_folder + file_name, 'w')
+    _zip_dir(".", lambda_code_zip)
+
+
+def calculate_hash(filename):
+    BLOCKSIZE = 65536
+    hasher = hashlib.md5()
+    with open(filename, 'rb') as afile:
+        buf = afile.read(BLOCKSIZE)
+        while len(buf) > 0:
+            hasher.update(buf)
+            buf = afile.read(BLOCKSIZE)
+    new_hash = hasher.hexdigest()
+    return new_hash
+
+
+def release_api_spec(config):
+    api_file = config["api_spec"]["file"]
+    release_bucket = config["release_bucket"]
+    os.chdir('api_spec' + "/")
+    upload_s3_key = checked_upload("./", api_file, config, "api")
+    os.chdir('..')
+    modify_template(config, config["api_spec"]["logical_resource_name"], upload_s3_key, release_bucket, outer_key="BodyS3Location", bucket="Bucket", key="Key",
+                    version="Version")
 
 
 def do_release(config):
@@ -136,6 +166,9 @@ def do_release(config):
                 each_lambda_folder
 
             )
+    if "api_spec" in config:
+        print("Uploading api spec: ")
+        release_api_spec(config)
 
 
 def do_change(config):
