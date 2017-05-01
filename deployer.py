@@ -56,29 +56,50 @@ def _zip_dir(path, a_zip_file):
 def release_lambda(config, each_lambda_config):
     lambda_folder = each_lambda_config["folder"]
     release_bucket = config["release_bucket"]
-    version = config["version"]
-    project_name = config["project_name"]
-    env = config["env"]
     os.chdir('lambda' + "/" + lambda_folder)
     code_zip_file_name = lambda_folder + '.zip'
     zip_it_in_tmp(code_zip_file_name)
     lambda_code_zip_key = checked_upload(tmp_folder, code_zip_file_name, config, "lambda")
     os.chdir('../..')
-    modify_template(config, each_lambda_config["logical_resource_name"], lambda_code_zip_key, release_bucket, outer_key="Code", bucket="S3Bucket", key="S3Key",
-                    version="S3ObjectVersion")
+    modify_template(
+        config, each_lambda_config,
+        lambda_code_zip_key,
+        release_bucket,
+        outer_key="Code",
+        bucket="S3Bucket",
+        key="S3Key"
+    )
 
 
-def modify_template(config, logical_resource_name, upload_s3_key, release_bucket, **kwargs):
+def modify_template(config, each_lambda_config, upload_s3_key, release_bucket, **kwargs):
+    with open("cloudformation/" + config["template_parameters"], mode="r+") as template_config_file:
+        template_config = json.load(template_config_file)
+        bucket_param_config = None
+        code_key_param = None
+        for each_config in template_config:
+            if each_config["ParameterKey"] == each_lambda_config["code_s3_bucket_param_name"]:
+                bucket_param_config = each_config
+            if each_config["ParameterKey"] == each_lambda_config["code_s3_key_param_name"]:
+                code_key_param = each_config
+        if bucket_param_config == None:
+            bucket_param_config = {}
+            template_config.append(bucket_param_config)
+        if code_key_param == None:
+            code_key_param = {}
+            template_config.append(code_key_param)
+        bucket_param_config["ParameterKey"] = each_lambda_config["code_s3_bucket_param_name"]
+        bucket_param_config["ParameterValue"] = release_bucket
+        code_key_param["ParameterKey"] = each_lambda_config["code_s3_key_param_name"]
+        code_key_param["ParameterValue"] = upload_s3_key
+        template_config_file.seek(0)
+        json.dump(template_config, template_config_file, indent=2)
+        template_config_file.truncate()
+
     with open("cloudformation/" + config["template"], mode="r+") as template_file:
-        s3_client = boto3_session.client('s3')
-        object_info = s3_client.head_object(
-            Bucket=release_bucket, Key=upload_s3_key
-        )
         template_contents = json.load(template_file)
-        template_contents["Resources"][logical_resource_name]["Properties"][kwargs["outer_key"]] = {
+        template_contents["Resources"][each_lambda_config["logical_resource_name"]]["Properties"][kwargs["outer_key"]] = {
             kwargs["bucket"]: release_bucket,
-            kwargs["key"]: upload_s3_key,
-            kwargs["version"]: object_info["VersionId"]
+            kwargs["key"]: upload_s3_key
         }
         # template_contents["Resources"][each_lambda_config["function_version_logical_resource_name"]]["Properties"]["CodeSha256"] = new_hash
         template_file.seek(0)
@@ -99,7 +120,6 @@ def checked_upload(directory, file_name, config, s3_prefix):
     deployed_hash = None
     try:
         deployed_hash = hash_s3_obj.get()["Body"].read().decode("utf-8")
-        print(deployed_hash)
     except ClientError as e:
         if e.response["Error"]["Code"] == "NoSuchKey":
             print(
@@ -153,8 +173,15 @@ def release_api_spec(config):
     os.chdir('api_spec' + "/")
     upload_s3_key = checked_upload("./", api_file, config, "api")
     os.chdir('..')
-    modify_template(config, config["api_spec"]["logical_resource_name"], upload_s3_key, release_bucket, outer_key="BodyS3Location", bucket="Bucket", key="Key",
-                    version="Version")
+    modify_template(
+        config,
+        config["api_spec"]["logical_resource_name"],
+        upload_s3_key,
+        release_bucket,
+        outer_key="BodyS3Location",
+        bucket="Bucket",
+        key="Key"
+    )
 
 
 def do_release(config):
@@ -182,7 +209,6 @@ def do_change(config):
         yaml.dump(config, config_file, default_flow_style=False)
     stack_arguments = make_stack_arguments(config)
     stack_arguments["ChangeSetName"] = "ChangeSet" + "-" + str(config["change_set_number"])
-    print_arguments(stack_arguments)
     cfn_client.create_change_set(**stack_arguments)
 
 
@@ -271,7 +297,6 @@ def do_delete(config):
     )
     import sys
     line = sys.stdin.readline().strip()
-    print(line)
     if not line == "Yes, I want to delete this stack.":
         print("OK, not deleting.")
         sys.exit(1)
@@ -361,7 +386,6 @@ def run():
         do_init()
     else:
         try:
-            print(args)
             build_config = yaml.load(open(args.config))
             credential_profile = build_config[
                 "credential_profile"] if "credential_profile" in build_config else "default"
@@ -446,7 +470,6 @@ def parse_args():
     )
     current_module = sys.modules[__name__]
     current_module.args = parser.parse_args()
-    print(args)
     if args.target == "exec-change" and not hasattr(args, "change_set_name"):
         parser.error("target exec_change must be accompanied by option --change-set-name")
     return args
