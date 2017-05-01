@@ -13,33 +13,6 @@ import boto3
 import os
 import yaml
 from botocore.exceptions import ClientError
-from ruamel import yaml as ry
-
-
-class Ref(str):
-    @staticmethod
-    def yaml_dumper(dumper, data):
-        return dumper.represent_scalar('!Ref', u'{}'.format(data), style='x')
-
-    @staticmethod
-    def yaml_constructor(loader, node):
-        value = loader.construct_scalar(node)
-        return Ref(value)
-
-
-ry.add_representer(Ref, Ref.yaml_dumper)
-ry.add_constructor('!Ref', Ref.yaml_constructor,
-                   constructor=ry.constructor.SafeConstructor)
-
-
-def choose_scalar_style(self):
-    if self.event.style == 'x':
-        return ''
-    return self.org_choose_scalar_style()
-
-
-ry.emitter.Emitter.org_choose_scalar_style = ry.emitter.Emitter.choose_scalar_style
-ry.emitter.Emitter.choose_scalar_style = choose_scalar_style
 
 tmp_folder = 'C:\\temp\\' if platform.system() == 'Windows' else "/tmp/"
 
@@ -61,50 +34,36 @@ def release_lambda(config, each_lambda_config):
     zip_it_in_tmp(code_zip_file_name)
     lambda_code_zip_key = checked_upload(tmp_folder, code_zip_file_name, config, "lambda")
     os.chdir('../..')
-    modify_template(
+    modify_template_config(
         config, each_lambda_config,
         lambda_code_zip_key,
-        release_bucket,
-        outer_key="Code",
-        bucket="S3Bucket",
-        key="S3Key"
+        release_bucket
     )
 
 
-def modify_template(config, each_lambda_config, upload_s3_key, release_bucket, **kwargs):
+def modify_template_config(config, api_or_lambda_config, upload_s3_key, release_bucket):
     with open("cloudformation/" + config["template_parameters"], mode="r+") as template_config_file:
         template_config = json.load(template_config_file)
         bucket_param_config = None
         code_key_param = None
         for each_config in template_config:
-            if each_config["ParameterKey"] == each_lambda_config["code_s3_bucket_param_name"]:
+            if each_config["ParameterKey"] == api_or_lambda_config["s3_bucket_param_name"]:
                 bucket_param_config = each_config
-            if each_config["ParameterKey"] == each_lambda_config["code_s3_key_param_name"]:
+            if each_config["ParameterKey"] == api_or_lambda_config["s3_key_param_name"]:
                 code_key_param = each_config
-        if bucket_param_config == None:
+        if bucket_param_config is None:
             bucket_param_config = {}
             template_config.append(bucket_param_config)
-        if code_key_param == None:
+        if code_key_param is None:
             code_key_param = {}
             template_config.append(code_key_param)
-        bucket_param_config["ParameterKey"] = each_lambda_config["code_s3_bucket_param_name"]
+        bucket_param_config["ParameterKey"] = api_or_lambda_config["s3_bucket_param_name"]
         bucket_param_config["ParameterValue"] = release_bucket
-        code_key_param["ParameterKey"] = each_lambda_config["code_s3_key_param_name"]
+        code_key_param["ParameterKey"] = api_or_lambda_config["s3_key_param_name"]
         code_key_param["ParameterValue"] = upload_s3_key
         template_config_file.seek(0)
         json.dump(template_config, template_config_file, indent=2)
         template_config_file.truncate()
-
-    with open("cloudformation/" + config["template"], mode="r+") as template_file:
-        template_contents = json.load(template_file)
-        template_contents["Resources"][each_lambda_config["logical_resource_name"]]["Properties"][kwargs["outer_key"]] = {
-            kwargs["bucket"]: release_bucket,
-            kwargs["key"]: upload_s3_key
-        }
-        # template_contents["Resources"][each_lambda_config["function_version_logical_resource_name"]]["Properties"]["CodeSha256"] = new_hash
-        template_file.seek(0)
-        json.dump(template_contents, template_file, indent=2)
-        template_file.truncate()
 
 
 def checked_upload(directory, file_name, config, s3_prefix):
@@ -173,14 +132,11 @@ def release_api_spec(config):
     os.chdir('api_spec' + "/")
     upload_s3_key = checked_upload("./", api_file, config, "api")
     os.chdir('..')
-    modify_template(
+    modify_template_config(
         config,
-        config["api_spec"]["logical_resource_name"],
+        config["api_spec"],
         upload_s3_key,
-        release_bucket,
-        outer_key="BodyS3Location",
-        bucket="Bucket",
-        key="Key"
+        release_bucket
     )
 
 
@@ -318,105 +274,41 @@ def do_exec_change(config):
     cfn_client.execute_change_set(**method_args)
 
 
-def do_init():
-    if os.path.isfile("project.yaml"):
-        print("project.yaml already exists. Cannot create. Exiting.")
-        sys.exit(0)
-    if not os.path.exists("cloudformation"):
-        print("directory named cloudformation does not exist. Creating.")
-        os.mkdir("cloudformation")
-    if os.path.isfile("cloudformation/template.yaml") or os.path.isfile("cloudformation/template.config.json"):
-        print("Either template.yaml or template.config.json already exists. Cannot create. Exiting.")
-        sys.exit(0)
-    with(open("project.yaml", "w+")) as new_project_file:
-        yaml.dump(
-            {
-                "env": "dev",
-                "project_name": "ChangeMe",
-                "region": "us-east-1",
-                "template": "template.yaml",
-                "template_parameters": "template.config.json",
-                "version": "1.0.0"
-            },
-            new_project_file,
-            default_flow_style=False
-        )
-    with(open("cloudformation/template.yaml", "w+")) as new_template:
-        ry.dump(
-            {
-                "AWSTemplateFormatVersion": "2010-09-09",
-                "Description": "ChangeMe",
-                "Resources": {
-                    "AResource": {
-                        "Type": "AWS::EC2::Instance",
-                        "Properties":
-                            {
-                                "ImageId": Ref("AParameter")
-                            }
-                    }
-
-                },
-                "Parameters": {
-                    "AParameter": {
-                        "Type": "String"
-                    }
-                }
-            },
-            new_template,
-            default_flow_style=False
-        )
-    with(open("cloudformation/template.config.json", "w+")) as new_template_config:
-        json.dump(
-            [
-                {
-                    "ParameterKey": "AParameter",
-                    "ParameterValue": "ami-22ce4934"
-                }
-            ],
-            new_template_config,
-            indent=4
-        )
-    pass
-
-
 def run():
     parse_args()
     current_module = sys.modules[__name__]
-    if args.target == "init":
-        do_init()
-    else:
-        try:
-            build_config = yaml.load(open(args.config))
-            credential_profile = build_config[
-                "credential_profile"] if "credential_profile" in build_config else "default"
-            if "region" in build_config:
-                session_config = {
-                    "profile_name": credential_profile,
-                    "region_name": build_config["region"]
-                }
-            else:
-                session_config = {
-                    "profile_name": credential_profile
-                }
+    try:
+        build_config = yaml.load(open(args.config))
+        credential_profile = build_config[
+            "credential_profile"] if "credential_profile" in build_config else "default"
+        if "region" in build_config:
+            session_config = {
+                "profile_name": credential_profile,
+                "region_name": build_config["region"]
+            }
+        else:
+            session_config = {
+                "profile_name": credential_profile
+            }
 
-            current_module.boto3_session = boto3.session.Session(**session_config)
-        except IOError as e:
-            print(
-                "Cannot continue. Could not open file " + args.config + ". Please ensure it exists and is readable.")
-            raise e
+        current_module.boto3_session = boto3.session.Session(**session_config)
+    except IOError as e:
+        print(
+            "Cannot continue. Could not open file " + args.config + ". Please ensure it exists and is readable.")
+        raise e
 
-        if args.target == "package":
-            do_release(build_config)
-        elif args.target == "create":
-            do_create(build_config)
-        elif args.target == "change":
-            do_change(build_config)
-        elif args.target == "cost":
-            do_cost(build_config)
-        elif args.target == "delete":
-            do_delete(build_config)
-        elif args.target == "exec-change":
-            do_exec_change(build_config)
+    if args.target == "package":
+        do_release(build_config)
+    elif args.target == "create":
+        do_create(build_config)
+    elif args.target == "change":
+        do_change(build_config)
+    elif args.target == "cost":
+        do_cost(build_config)
+    elif args.target == "delete":
+        do_delete(build_config)
+    elif args.target == "exec-change":
+        do_exec_change(build_config)
 
 
 def parse_args():
