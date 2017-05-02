@@ -35,22 +35,33 @@ def release_lambda(config, each_lambda_config):
     lambda_code_zip_key = checked_upload(tmp_folder, code_zip_file_name, config, "lambda")
     os.chdir('../..')
     modify_template_config(
-        config, each_lambda_config,
+        config,
+        each_lambda_config,
         lambda_code_zip_key,
         release_bucket
     )
 
 
 def modify_template_config(config, api_or_lambda_config, upload_s3_key, release_bucket):
+    s3_client = boto3_session.client('s3')
+    object_info = s3_client.head_object(
+        Bucket=release_bucket, Key=upload_s3_key
+    )
     with open("cloudformation/" + config["template_parameters"], mode="r+") as template_config_file:
         template_config = json.load(template_config_file)
         bucket_param_config = None
         code_key_param = None
+        code_version_param = None
         for each_config in template_config:
+            if each_config["ParameterKey"] == api_or_lambda_config["s3_version_param_name"]:
+                code_version_param = each_config
             if each_config["ParameterKey"] == api_or_lambda_config["s3_bucket_param_name"]:
                 bucket_param_config = each_config
             if each_config["ParameterKey"] == api_or_lambda_config["s3_key_param_name"]:
                 code_key_param = each_config
+        if code_version_param is None:
+            code_version_param = {}
+            template_config.append(code_version_param)
         if bucket_param_config is None:
             bucket_param_config = {}
             template_config.append(bucket_param_config)
@@ -61,6 +72,8 @@ def modify_template_config(config, api_or_lambda_config, upload_s3_key, release_
         bucket_param_config["ParameterValue"] = release_bucket
         code_key_param["ParameterKey"] = api_or_lambda_config["s3_key_param_name"]
         code_key_param["ParameterValue"] = upload_s3_key
+        code_version_param["ParameterKey"] = api_or_lambda_config["s3_version_param_name"]
+        code_version_param["ParameterValue"] = object_info["VersionId"]
         template_config_file.seek(0)
         json.dump(template_config, template_config_file, indent=2)
         template_config_file.truncate()
@@ -204,7 +217,6 @@ def print_arguments(create_stack_arguments):
     import copy
     deepcopy = copy.deepcopy(create_stack_arguments)
     deepcopy["TemplateBody"] = "Removed"
-    print(deepcopy)
 
 
 def get_template_as_string(config):
