@@ -207,8 +207,10 @@ def make_stack_arguments(config):
 
 
 def create_stack_name(config):
-    env_suffix = "-" + get_env(config)
-    ver_suffix = "-" + get_ver(config).replace(".", "-")
+    env = get_env(config)
+    env_suffix = "-" + env if len(env) > 0 else ""
+    ver = get_ver(config).replace(".", "-")
+    ver_suffix = "-" + ver if len(ver) > 0 else ""
     stack_name = config["project_name"] + ver_suffix + env_suffix
     return stack_name
 
