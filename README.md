@@ -12,16 +12,22 @@ To install the [latest release](https://github.com/FastUp/cfn-deployer/releases/
 ## Usage
 To view help: 
 `deployer help`
+
 To create stack:
 `deployer create`
+
 To create a change-set on a stack:
 `deployer change`
+
 To execute a change-set:
 `deployer exec-change`
+
 To delete a stack:
 `deployer delete`
+
 To package a Lambda function:
 `deployer package`
+
 To estimate costs:
 `deployer cost`
 
