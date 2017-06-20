@@ -14,7 +14,7 @@ setup(
     name='cfndeployer',
 
 
-    version='0.1.3',
+    version='0.1.4',
 
     description='A tool to deploy cloudformation stacks',
     long_description=long_description,
@@ -65,7 +65,7 @@ setup(
     # your project is installed. For an analysis of "install_requires" vs pip's
     # requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
-    install_requires=['boto3','pyyaml','ruamel.yaml'],
+    install_requires=['boto3','pyyaml'],
 
     # List additional groups of dependencies here (e.g. development
     # dependencies). You can install these using the following syntax,
