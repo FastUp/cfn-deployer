@@ -81,13 +81,18 @@ def modify_template_config(config, api_or_lambda_config, upload_s3_key, release_
 
 def checked_upload(directory, file_name, config, s3_prefix):
     release_bucket = config["release_bucket"]
-    version = config["version"]
+
+    version = get_ver(config)
+    if len(version) != 0:
+        version = version + "/"
     project_name = config["project_name"]
-    env = config["env"]
+    env = get_env(config)
+    if len(env) != 0:
+        env = env + "/"
     new_hash = calculate_hash(directory + file_name)
     s3_client = boto3_session.resource('s3')
-    object_s3_key = project_name + "/" + version + "/" + env + '/' + s3_prefix + '/' + file_name
-    hash_s3_key = project_name + "/" + version + "/" + env + '/' + s3_prefix + '/' + file_name + ".md5"
+    object_s3_key = project_name + "/" + version + env + s3_prefix + '/' + file_name
+    hash_s3_key = project_name + "/" + version + env + s3_prefix + '/' + file_name + ".md5"
     hash_s3_obj = s3_client.Object(release_bucket, hash_s3_key)
     deployed_hash = None
     try:
@@ -177,7 +182,8 @@ def do_change(config):
     with open(args.config, "w") as config_file:
         yaml.dump(config, config_file, default_flow_style=False)
     stack_arguments = make_stack_arguments(config)
-    stack_arguments["ChangeSetName"] = "ChangeSet" + "-" + str(config["change_set_number"])
+    change_set_prefix = config["change_set_prefix"] if "change_set_prefix" in config else "ChangeSet"
+    stack_arguments["ChangeSetName"] = change_set_prefix + "-" + str(config["change_set_number"])
     cfn_client.create_change_set(**stack_arguments)
 
 
@@ -222,12 +228,12 @@ def print_arguments(create_stack_arguments):
 
 
 def get_template_as_string(config):
-    template_stream = open("cloudformation/" + config["template"])
-    data = ""
-    lines = template_stream.readlines()
-    for line in lines:
-        data += line
-    return data
+    with open("cloudformation/" + config["template"]) as template_stream:
+        data = ""
+        lines = template_stream.readlines()
+        for line in lines:
+            data += line
+        return data
 
 
 def do_create(config):
