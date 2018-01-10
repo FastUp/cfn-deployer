@@ -203,11 +203,11 @@ def make_stack_arguments(config):
     if args.iam_capabilities is not None:
         stack_arguments["Capabilities"] = [args.iam_capabilities]
     if "create_arguments" in config:
-        config["create_arguments"].pop("StackName", None)
-        config["create_arguments"].pop("TemplateBody", None)
-        config["create_arguments"].pop("TemplateURL", None)
-        config["create_arguments"].pop("Parameters", None)
-        config["create_arguments"].pop("Capabilities", None)
+        config["create_arguments"].pop("StackName")
+        config["create_arguments"].pop("TemplateBody")
+        config["create_arguments"].pop("TemplateURL")
+        config["create_arguments"].pop("Parameters")
+        config["create_arguments"].pop("Capabilities")
         stack_arguments.update(config["create_arguments"])
     return stack_arguments
 
