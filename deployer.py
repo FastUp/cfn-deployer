@@ -181,13 +181,13 @@ def do_change(config):
     config["change_set_number"] = change_set_num
     with open(args.config, "w") as config_file:
         yaml.dump(config, config_file, default_flow_style=False)
-    stack_arguments = make_stack_arguments(config)
+    stack_arguments = make_stack_arguments(config,"change")
     change_set_prefix = config["change_set_prefix"] if "change_set_prefix" in config else "ChangeSet"
     stack_arguments["ChangeSetName"] = change_set_prefix + "-" + str(config["change_set_number"])
     cfn_client.create_change_set(**stack_arguments)
 
 
-def make_stack_arguments(config):
+def make_stack_arguments(config,change_or_create="create"):
     stack_name = create_stack_name(config)
     data = get_template_as_string(config)
     stack_arguments = {
@@ -202,7 +202,7 @@ def make_stack_arguments(config):
         )
     if args.iam_capabilities is not None:
         stack_arguments["Capabilities"] = [args.iam_capabilities]
-    if "create_arguments" in config:
+    if "create_arguments" in config and change_or_create == "create":
         config["create_arguments"].pop("StackName",None)
         config["create_arguments"].pop("TemplateBody",None)
         config["create_arguments"].pop("TemplateURL",None)
