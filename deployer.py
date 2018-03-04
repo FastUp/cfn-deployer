@@ -47,7 +47,7 @@ def modify_template_config(config, api_or_lambda_config, upload_s3_key, release_
     object_info = s3_client.head_object(
         Bucket=release_bucket, Key=upload_s3_key
     )
-    with open("cloudformation/" + config["template_parameters"], mode="r+") as template_config_file:
+    with open(config["template_parameters"], mode="r+") as template_config_file:
         template_config = json.load(template_config_file)
         bucket_param_config = None
         code_key_param = None
@@ -181,13 +181,13 @@ def do_change(config):
     config["change_set_number"] = change_set_num
     with open(args.config, "w") as config_file:
         yaml.dump(config, config_file, default_flow_style=False)
-    stack_arguments = make_stack_arguments(config,"change")
+    stack_arguments = make_stack_arguments(config, "change")
     change_set_prefix = config["change_set_prefix"] if "change_set_prefix" in config else "ChangeSet"
     stack_arguments["ChangeSetName"] = change_set_prefix + "-" + str(config["change_set_number"])
     cfn_client.create_change_set(**stack_arguments)
 
 
-def make_stack_arguments(config,change_or_create="create"):
+def make_stack_arguments(config, change_or_create="create"):
     stack_name = create_stack_name(config)
     data = get_template_as_string(config)
     stack_arguments = {
@@ -195,19 +195,15 @@ def make_stack_arguments(config,change_or_create="create"):
         "TemplateBody": data,
     }
     if "template_parameters" in config:
-        stack_arguments["Parameters"] = json.load(
-            open(
-                "cloudformation/" + config["template_parameters"]
-            )
-        )
+        stack_arguments["Parameters"] = json.load(open(config["template_parameters"]))
     if args.iam_capabilities is not None:
         stack_arguments["Capabilities"] = [args.iam_capabilities]
     if "create_arguments" in config and change_or_create == "create":
-        config["create_arguments"].pop("StackName",None)
-        config["create_arguments"].pop("TemplateBody",None)
-        config["create_arguments"].pop("TemplateURL",None)
-        config["create_arguments"].pop("Parameters",None)
-        config["create_arguments"].pop("Capabilities",None)
+        config["create_arguments"].pop("StackName", None)
+        config["create_arguments"].pop("TemplateBody", None)
+        config["create_arguments"].pop("TemplateURL", None)
+        config["create_arguments"].pop("Parameters", None)
+        config["create_arguments"].pop("Capabilities", None)
         stack_arguments.update(config["create_arguments"])
     return stack_arguments
 
@@ -228,7 +224,7 @@ def print_arguments(create_stack_arguments):
 
 
 def get_template_as_string(config):
-    with open("cloudformation/" + config["template"]) as template_stream:
+    with open(config["template"]) as template_stream:
         data = ""
         lines = template_stream.readlines()
         for line in lines:
@@ -256,7 +252,7 @@ def do_cost(config):
     if "template_parameters" in config:
         stack_arguments["Parameters"] = json.load(
             open(
-                "cloudformation/" + config["template_parameters"]
+                config["template_parameters"]
             )
         )
 
