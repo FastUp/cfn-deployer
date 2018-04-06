@@ -47,7 +47,7 @@ def modify_template_config(config, api_or_lambda_config, upload_s3_key, release_
     object_info = s3_client.head_object(
         Bucket=release_bucket, Key=upload_s3_key
     )
-    with open("cloudformation/" + config["template_parameters"], mode="r+") as template_config_file:
+    with open(config["template_parameters"], mode="r+") as template_config_file:
         template_config = json.load(template_config_file)
         bucket_param_config = None
         code_key_param = None
@@ -196,9 +196,7 @@ def make_stack_arguments(config,change_or_create="create"):
     }
     if "template_parameters" in config:
         stack_arguments["Parameters"] = json.load(
-            open(
-                "cloudformation/" + config["template_parameters"]
-            )
+            open(config["template_parameters"])
         )
     if args.iam_capabilities is not None:
         stack_arguments["Capabilities"] = [args.iam_capabilities]
@@ -228,7 +226,7 @@ def print_arguments(create_stack_arguments):
 
 
 def get_template_as_string(config):
-    with open("cloudformation/" + config["template"]) as template_stream:
+    with open(config["template"]) as template_stream:
         data = ""
         lines = template_stream.readlines()
         for line in lines:
@@ -255,9 +253,7 @@ def do_cost(config):
     }
     if "template_parameters" in config:
         stack_arguments["Parameters"] = json.load(
-            open(
-                "cloudformation/" + config["template_parameters"]
-            )
+            open(config["template_parameters"])
         )
 
     cost = cfn_client.estimate_template_cost(**stack_arguments)
