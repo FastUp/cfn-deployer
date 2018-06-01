@@ -29,8 +29,8 @@ def _zip_dir(path, a_zip_file):
 def release_lambda(config, each_lambda_config):
     lambda_folder = each_lambda_config["folder"]
     release_bucket = config["release_bucket"]
-    os.chdir('lambda' + "/" + lambda_folder)
-    code_zip_file_name = lambda_folder + '.zip'
+    os.chdir(lambda_folder)
+    code_zip_file_name = lambda_folder.split("/")[1] + '.zip'
     zip_it_in_tmp(code_zip_file_name)
     lambda_code_zip_key = checked_upload(tmp_folder, code_zip_file_name, config, "lambda")
     os.chdir('../..')
@@ -113,7 +113,8 @@ def checked_upload(directory, file_name, config, s3_prefix):
             "). Will upload new code."
         )
         print("\ts3://" + release_bucket + "/" + hash_s3_key)
-        hash_s3_obj.put(Body=bytes(new_hash))
+        b = bytes(new_hash,"utf-8")
+        hash_s3_obj.put(Body=b)
         lambda_code_s3_obj = s3_client.Object(release_bucket, object_s3_key)
         print("\ts3://" + release_bucket + "/" + object_s3_key)
         lambda_code_s3_obj.upload_file(directory + file_name)
