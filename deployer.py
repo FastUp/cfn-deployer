@@ -113,8 +113,7 @@ def checked_upload(directory, file_name, config, s3_prefix):
             "). Will upload new code."
         )
         print("\ts3://" + release_bucket + "/" + hash_s3_key)
-        b = bytes(new_hash,"utf-8")
-        hash_s3_obj.put(Body=b)
+        hash_s3_obj.put(Body=bytes(new_hash))
         lambda_code_s3_obj = s3_client.Object(release_bucket, object_s3_key)
         print("\ts3://" + release_bucket + "/" + object_s3_key)
         lambda_code_s3_obj.upload_file(directory + file_name)
@@ -188,7 +187,7 @@ def do_change(config):
     cfn_client.create_change_set(**stack_arguments)
 
 
-def make_stack_arguments(config, change_or_create="create"):
+def make_stack_arguments(config,change_or_create="create"):
     stack_name = create_stack_name(config)
     data = get_template_as_string(config)
     stack_arguments = {
@@ -196,7 +195,11 @@ def make_stack_arguments(config, change_or_create="create"):
         "TemplateBody": data,
     }
     if "template_parameters" in config:
-        stack_arguments["Parameters"] = json.load(open(config["template_parameters"]))
+        stack_arguments["Parameters"] = json.load(
+            open(
+                 config["template_parameters"]
+            )
+        )
     if args.iam_capabilities is not None:
         stack_arguments["Capabilities"] = [args.iam_capabilities]
     if "create_arguments" in config and change_or_create == "create":
@@ -253,7 +256,7 @@ def do_cost(config):
     if "template_parameters" in config:
         stack_arguments["Parameters"] = json.load(
             open(
-                config["template_parameters"]
+                 config["template_parameters"]
             )
         )
 
