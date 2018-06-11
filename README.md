@@ -3,6 +3,7 @@
 Deploying cloudformation stacks to AWS from the command line is fairly easy. It may become tedious or a bit error prone when frequent change sets are needed. This tool simplifies the creation and updates to a CloudFormation stack.
 
 
+
 ## Install instructions
 
 To install the [latest release](https://github.com/FastUp/cfn-deployer/releases/latest) from the master branch:
