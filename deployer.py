@@ -2,11 +2,14 @@ from __future__ import print_function
 
 import argparse
 import hashlib
-import imp
+import sys
+if sys.version_info[0] < 3:
+    import imp
+else:
+    import importlib as imp
 import json
 import os.path
 import platform
-import sys
 import zipfile
 
 import boto3
@@ -187,7 +190,7 @@ def do_change(config):
     cfn_client.create_change_set(**stack_arguments)
 
 
-def make_stack_arguments(config,change_or_create="create"):
+def make_stack_arguments(config, change_or_create="create"):
     stack_name = create_stack_name(config)
     data = get_template_as_string(config)
     stack_arguments = {
@@ -197,7 +200,7 @@ def make_stack_arguments(config,change_or_create="create"):
     if "template_parameters" in config:
         stack_arguments["Parameters"] = json.load(
             open(
-                 config["template_parameters"]
+                config["template_parameters"]
             )
         )
     if args.iam_capabilities is not None:
@@ -256,7 +259,7 @@ def do_cost(config):
     if "template_parameters" in config:
         stack_arguments["Parameters"] = json.load(
             open(
-                 config["template_parameters"]
+                config["template_parameters"]
             )
         )
 
@@ -299,8 +302,14 @@ def run():
     current_module = sys.modules[__name__]
     try:
         build_config = yaml.load(open(args.config))
-        credential_profile = build_config[
-            "credential_profile"] if "credential_profile" in build_config else "default"
+        if "credential_profile" in build_config:
+            print("""WARNING: The credential_profile option in project yaml is deprecated. 
+            Please use --profile command line option instead.""")
+            credential_profile = build_config["credential_profile"]
+        elif args.profile:
+            credential_profile = args.profile
+        else:
+            credential_profile = "default"
         if "region" in build_config:
             session_config = {
                 "profile_name": credential_profile,
@@ -378,6 +387,12 @@ def parse_args():
         "--change-set-name",
         help='''
         If executing a change set, this must be set.
+        '''
+    )
+    parser.add_argument(
+        "--profile",
+        help='''
+        The AWS Credential profile name you want to use with this deployment.
         '''
     )
     current_module = sys.modules[__name__]
