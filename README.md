@@ -1,8 +1,8 @@
 # CloudFormation Deployer
 
 AWS CLI provides a well documented command to create and manage CloudFormation Stacks. That command may become tedious 
-or a error prone when frequent change sets are needed or when change management is shared in a team. 
-This tool simplifies creating, managing and sharing to a CloudFormation stack changes on a command line.
+or error prone when frequent change sets are needed or when change management is shared in a team. 
+This tool simplifies creating, managing and sharing Cloudformation stacks on a command line.
 
 
 ## Why use it
