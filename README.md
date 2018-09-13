@@ -78,6 +78,12 @@ To install the [latest release](https://github.com/FastUp/cfn-deployer/releases/
 `
   pip install git+https://github.com/FastUp/cfn-deployer.git@Alpha
 `
+
+To upgrade:
+`
+  pip install --upgrade git+https://github.com/FastUp/cfn-deployer.git@Alpha
+`
+
 ## Usage
 To view help: 
 `deployer help`
