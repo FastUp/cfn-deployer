@@ -3,6 +3,7 @@ from __future__ import print_function
 import argparse
 import hashlib
 import sys
+
 if sys.version_info[0] < 3:
     import imp
 else:
@@ -187,7 +188,8 @@ def do_change(config):
     stack_arguments = make_stack_arguments(config, "change")
     change_set_prefix = config["change_set_prefix"] if "change_set_prefix" in config else "ChangeSet"
     stack_arguments["ChangeSetName"] = change_set_prefix + "-" + str(config["change_set_number"])
-    cfn_client.create_change_set(**stack_arguments)
+    change_set_response = cfn_client.create_change_set(**stack_arguments)
+    print(json.dumps(change_set_response))
 
 
 def make_stack_arguments(config, change_or_create="create"):
@@ -310,15 +312,12 @@ def run():
             credential_profile = args.profile
         else:
             credential_profile = "default"
+        session_config = {
+            "profile_name": credential_profile
+        }
+
         if "region" in build_config:
-            session_config = {
-                "profile_name": credential_profile,
-                "region_name": build_config["region"]
-            }
-        else:
-            session_config = {
-                "profile_name": credential_profile
-            }
+            session_config["region_name"] = build_config["region"]
 
         current_module.boto3_session = boto3.session.Session(**session_config)
     except IOError as e:

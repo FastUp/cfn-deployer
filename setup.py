@@ -14,7 +14,7 @@ setup(
     name='cfndeployer',
 
 
-    version='0.1.9',
+    version='0.1.10',
 
     description='A tool to deploy cloudformation stacks',
     long_description=long_description,
