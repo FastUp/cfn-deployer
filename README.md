@@ -10,7 +10,7 @@ CFN Deployer applies a convention to creating and managing Cloudformation stacks
 Instead of creating a command line with the right command, right options each time, one may setup a "project" 
 configuration and run the CFN Deployer. 
 This project configuration can be committed to a Version Control system such as git or svn and shared among team members. 
-This provides a repeatable, standard way to create and manage cloudformation stacks. 
+This provides a repeatable, standard way to create and manage cloudformation stacks from the command line.
 
 ## How to use it
 CFN Deployer looks for a project configuration file at the file specified by the --config parameter. In that project 
@@ -32,13 +32,14 @@ change_set_number: 29
 ### Here, in Create Arguments, one may provide arguments supported by cloudformation boto3[2][3] with exceptions. 
 ### Exceptions are: StackName, TemplateBody, TemplateURL, Parameters, Capabilities. These keys will be ignored.
 create_arguments:
-  ### The role which Cloudformation[4] assumes to create the stack
+  ### An optional role ARN that Cloudformation[4] assumes to create the stack
   RoleARN: arn:aws:iam::1234567890:role/MyCloudformationRole
-### The AWS credential profile[4] to use in the user's workstation where this command is being run.
+### Optional: The AWS credential profile[4] to use in the user's workstation where this command is being run. 
+### Default is to use the default profile.
 credential_profile: fastupappprod
 ### The project_name is used to create the cloudformation stack's name. In this case, the name of the resulting 
 project_name: FastUpIAMAccess
-### The region to create or manage stack in - this overrides the user's workstation AWS CLI configuration[5] 
+### This optional key overrides the user's workstation AWS CLI configuration[5] 
 region: us-east-1
 ### CFN Deployer looks for a template[6] at the provided path to create the stack from.
 template: /path/to/mycloudformationtemplate.yaml
@@ -119,4 +120,4 @@ deloyer --config mystack.project.yaml package
 
 To estimate costs:
 `deployer cost`
-a code be kept in subfolders under a folder named `lambda`
+
