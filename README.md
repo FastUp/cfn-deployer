@@ -8,7 +8,7 @@ Deploying cloudformation stacks to AWS from the command line is fairly easy. It 
 
 To install the [latest release](https://github.com/FastUp/cfn-deployer/releases/latest) from the master branch:
 `
-  pip install git+https://github.com/FastUp/cfn-deployer.git@GA
+  pip install git+https://github.com/FastUp/cfn-deployer.git@Alpha
 `
 ## Usage
 To view help: 
