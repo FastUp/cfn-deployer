@@ -3,11 +3,6 @@ from __future__ import print_function
 import argparse
 import hashlib
 import sys
-
-if sys.version_info[0] < 3:
-    import imp
-else:
-    import importlib as imp
 import json
 import os.path
 import platform
@@ -17,6 +12,11 @@ import boto3
 import os
 import yaml
 from botocore.exceptions import ClientError
+
+if sys.version_info[0] < 3:
+    import imp
+else:
+    import importlib as imp
 
 tmp_folder = 'C:\\temp\\' if platform.system() == 'Windows' else "/tmp/"
 
